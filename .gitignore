@@ -1,0 +1,5 @@
+.vscode/
+node_modules/
+application/*.js
+*.db3
+*.pyc

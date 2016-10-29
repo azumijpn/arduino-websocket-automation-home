@@ -1,0 +1,26 @@
+{
+  "name": "dashboard",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jfouche/"
+  },
+  "license": "WTFPL",
+  "description": "L'objectif de ce github est de creer une application opensource de domotique très simple. Elle regroupe des fonctionnalités:\r - Dashboard bootstrap: Permettra d'afficher les données avec une interface responsive design.\r - Un serveur: Ecrit en python, ce serveur récupère les données provenant d'un client et les inserts dans une base de donnée.\r - Une base de donnée: Stock les données des capteurs répartie sur les cartes arduinos.\r - Un client collectant les données et les envoyants au serveur.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "ts-loader": "^0.8.2",
+    "tslint": "^3.15.1",
+    "typescript": "^1.8.10"
+  },
+  "devDependencies": {
+    "webpack": "^1.13.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": ""
+}
