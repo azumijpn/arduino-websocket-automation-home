@@ -60,6 +60,7 @@ Compiler avec l'IDE arduino 1.6.2 ou superieur.
 - https://github.com/djsb/arduino-websocketclient
 - https://github.com/adngdb/python-websocket-server/blob/master/websocketserver.py
 - https://github.com/dpallot/simple-websocket-server
+- https://github.com/brandenhall/Arduino-Websocket
 
 ---------------------
 The MIT License (MIT) https://opensource.org/licenses/MIT
