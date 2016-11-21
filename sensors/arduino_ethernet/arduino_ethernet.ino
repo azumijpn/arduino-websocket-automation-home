@@ -30,7 +30,7 @@ DallasTemperature sensor_cumulus(&TMP_CUMULUS);
 
 /*################# Parameters #################*/
 
-const String LOCATION = "CUMULUS";          // Emplacement du capteur arduino
+//const String LOCATION = "CUMULUS";          // Emplacement du capteur arduino
 const String HOSTNAME = "ARDUINO_ETHERNET"; // Name arduino
 #define IPSERVER   "192.168.100.245"        // Serveur distant
 #define PORT        8000                    // Port du serveur distant
@@ -114,10 +114,11 @@ void loop() {
 
   JsonObject& jsonTemperature = jsonBufferTemp.createObject();
   jsonTemperature["msg"] = "setTemperature";
-  jsonTemperature["location"] = LOCATION;
+  //jsonTemperature["location"] = LOCATION;
   jsonTemperature["temperature"] = temperature;
 
   jsonTemperature.printTo(Buff, sizeof(Buff));
+  Serial.println(Buff);
 
   transmission(Buff);
   
