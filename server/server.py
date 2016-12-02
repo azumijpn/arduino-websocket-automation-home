@@ -41,6 +41,7 @@ class Database(object) :
 
     def __init__(self, dbname):
         self.db = sqlite3.connect(dbname)
+	self.db.row_factory = sqlite3.Row
         cursor = self.db.cursor()
         cursor.execute(SQL_CREATE_MODULES)
         cursor.execute(SQL_CREATE_TEMPERATURES)
@@ -62,10 +63,14 @@ class Database(object) :
 	cursor.execute("UPDATE modules SET status=? WHERE address=?", [status, address])
         self.db.commit()
 
+	#TODO: date limite
     def getAllTemperatures(self, address):
-	print('recupere temperature')
+	print('---------------DB getAlltemperatures-------------------')
         cursor = self.db.cursor()
-        temperatures = cursor.execute("SELECT temperature,time FROM temperatures INNER JOIN modules WHERE id_module=modules.id and address=?", [address])
+        rows = cursor.execute("SELECT temperature,time FROM temperatures INNER JOIN modules WHERE address=?", [address]).fetchall()
+	json_string = json.dumps( [dict(ix) for ix in rows] ) #CREATE JSON
+	print(json_string)
+	#TODO: send message to the client
 
 DB = Database("database.db3")
 
@@ -80,23 +85,25 @@ class WebSocketHandler(WebSocket):
         print(self.address, 'closed')
 	DB.updateModule(self.address[0], 'DISCONNECTED')
 
-	# Request type Json OBJ ==> { 'msg': '<methode><request>', 'sensor': 'arduino' '<resquest>': '18.13' }
+	# Request type Json OBJ ==> { 'msg': '<methode><request>', 'sensor': 'arduino' '<resquest>': 'value' }
 	# Example { 'msg': 'setTemperature', 'sensor': 'arduino' 'temperature': '18.13' }
     def handleMessage(self):
+        print('----------------------func_message------------------------')
         print('message :', self.data)
         obj = json.loads(self.data)
-	if obj['sensor']:
+	if 'sensor' in obj:
 		DB.addModule(self.address[0], obj['sensor'])
         if not obj: return
         msg = obj['msg']
         print('msg :', msg)
         if not msg: return
         methodName = "handle_" + msg
-        if hasattr(self, methodName) :
+        if hasattr(self, methodName):
             getattr(self, methodName)(obj)
 
 	# JSON structure { 'msg': 'setTemperature', 'sensor': 'arduino' 'temperature': '18.13' }
     def handle_setTemperature(self, obj):
+        print('----------------------func_setTemperature------------------------')
         temperature = float(obj['temperature'])
         print('temperature', temperature)
         now = int(time.time())
@@ -105,10 +112,11 @@ class WebSocketHandler(WebSocket):
         #self.sendTemperature(now, temperature)
 
 	# Example Json OBJ ==> { 'msg': 'getTemperature', 'address': 'xxx.xxx.xxx.xxx' }
-    def handle_getTemperature(self, obj):
+    def handle_getAllTemperatures(self, obj):
+        print('---------------------func_getAllTemperatures--------------------------')
         address = obj['address']
         print('address', address)
-        DB.getAllTemperatures(self, address)
+        DB.getAllTemperatures(address)
 
 #    def sendTemperature(self, time, temperature):
 #        print('sendTemperature :', temperature)
@@ -118,6 +126,12 @@ class WebSocketHandler(WebSocket):
 #            connection.sendMessage(msg)
 
 # ============================================================================
-if __name__ == "__main__" : 
-    server = SimpleWebSocketServer(config.socketBind, config.socketPort, WebSocketHandler)
-    server.serveforever()
+if __name__ == "__main__" :
+    try:
+    	server = SimpleWebSocketServer(config.socketBind, config.socketPort, WebSocketHandler)
+    	server.serveforever()
+    except KeyboardInterrupt:
+	#TODO Gerer les exceptions
+	print('todo')
+	#DB.updateModule(self.address[0], 'DISCONNECTED')
+
