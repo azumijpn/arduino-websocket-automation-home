@@ -63,14 +63,14 @@ class Database(object) :
 	cursor.execute("UPDATE modules SET status=? WHERE address=?", [status, address])
         self.db.commit()
 
-	#TODO: date limite
+	#TODO: date limite or limit de line
     def getAllTemperatures(self, address):
 	print('---------------DB getAlltemperatures-------------------')
         cursor = self.db.cursor()
         rows = cursor.execute("SELECT temperature,time FROM temperatures INNER JOIN modules WHERE address=?", [address]).fetchall()
-	json_string = json.dumps( [dict(ix) for ix in rows] ) #CREATE JSON
-	print(json_string)
-	#TODO: send message to the client
+	json_obj = json.dumps( [dict(ix) for ix in rows] ) #CREATE JSON
+	print(json_obj)
+	return json_obj
 
 DB = Database("database.db3")
 
@@ -109,14 +109,15 @@ class WebSocketHandler(WebSocket):
         now = int(time.time())
         print('time', now)
         DB.addTemperature(self.address[0], now, temperature)
-        #self.sendTemperature(now, temperature)
+#        self.sendTemperature(now, temperature)
 
 	# Example Json OBJ ==> { 'msg': 'getTemperature', 'address': 'xxx.xxx.xxx.xxx' }
     def handle_getAllTemperatures(self, obj):
         print('---------------------func_getAllTemperatures--------------------------')
         address = obj['address']
         print('address', address)
-        DB.getAllTemperatures(address)
+        payload = DB.getAllTemperatures(address)
+	self.sendMessage(payload)
 
 #    def sendTemperature(self, time, temperature):
 #        print('sendTemperature :', temperature)
@@ -132,6 +133,9 @@ if __name__ == "__main__" :
     	server.serveforever()
     except KeyboardInterrupt:
 	#TODO Gerer les exceptions
-	print('todo')
+	pass
+	print('close')
 	#DB.updateModule(self.address[0], 'DISCONNECTED')
+    #finally:
+	
 
