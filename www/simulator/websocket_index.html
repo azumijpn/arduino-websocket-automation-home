@@ -1,0 +1,89 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="fr" >
+    <head>
+        <title></title>
+        <meta http-equiv="Content-Type" content="application/json; charset=utf-8" />
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+        <script type="text/javascript">
+
+// Configuration
+var host = "192.168.100.245";
+var port = "8000";
+
+// WebSocket connection object
+var ws;
+
+function init() {
+    // Connect to Web Socket
+    ws = new WebSocket("ws://" + host + ":" + port + "/");
+    ws.binaryType = "blob";
+
+    //Open
+    ws.onopen = function() {
+	console.log('Connection opened')
+        var obj = { msg: 'getAllTemperatures', address: "192.168.100.150" };
+	ws.send(JSON.stringify(obj));
+    };
+
+    //Close
+    ws.onclose = function() {
+        //output("onclose");
+    };
+
+    //Receive
+    ws.onmessage = function(e) {
+	console.log('Message received');
+	if (e.data instanceof Blob) {
+		reader = new FileReader();
+		reader.onload = function() {
+			var jsonObj = JSON.parse(reader.result);
+			console.log(jsonObj);
+			for (var i=0; i < jsonObj.length; i++) {
+				console.log(jsonObj[i].temperature, jsonObj[i].time);
+				process_temperature(jsonObj[i].temperature, jsonObj[i].time);
+			}
+		};
+		reader.readAsBinaryString(e.data); 
+	}
+    };
+
+    // Log errors
+    ws.onerror = function (error) {
+	console.log('WebSocket Error ' + error);
+    };
+}
+
+function output(str) {
+  alert(str);
+}
+
+// What to do when receiving a message from the server
+function process_temperature(temperature, time) {
+    $('#time').append('<p> temperature : ' + temperature + '°C time : ' + timestampToDate(time) + '</p>')
+}
+
+function timestampToDate(time) {
+	var timestamp = new Date(time * 1000);
+        return (timestamp.getFullYear() + '/' + timestamp.getMonth() + '/' + timestamp.getDate() + '--' + timestamp.getHours() + ':' + timestamp.getMinutes() + ':' + timestamp.getSeconds());
+}
+
+$(document).ready(function() {
+    init();
+    $('#send').click(function(e) {
+        e.preventDefault();
+        var text = $('#chat_text').attr('value');
+        ws.send(text);
+        $('#chat_text').attr('value', '');
+    });
+});
+        </script>
+    </head>
+    <body>
+	    <input type="text" name="get_temperature" id="get_temperature" />
+	    <input type="text" name="get_time" id="get_time" /></br>
+            <input type="text" name="chat_text" id="chat_text" />
+            <button type="submit" id="send">Get</button>
+
+            <div id="time"></div>
+    </body>
+</html>

@@ -64,6 +64,7 @@ class Database(object) :
         self.db.commit()
 
 	#TODO: date limite or limit de line
+	#TODO: add test line is empty
     def getAllTemperatures(self, address):
 	print('---------------DB getAlltemperatures-------------------')
         cursor = self.db.cursor()
@@ -99,7 +100,7 @@ class WebSocketHandler(WebSocket):
         if not msg: return
         methodName = "handle_" + msg
         if hasattr(self, methodName):
-            getattr(self, methodName)(obj)
+		getattr(self, methodName)(obj)
 
 	# JSON structure { 'msg': 'setTemperature', 'sensor': 'arduino' 'temperature': '18.13' }
     def handle_setTemperature(self, obj):
@@ -109,7 +110,7 @@ class WebSocketHandler(WebSocket):
         now = int(time.time())
         print('time', now)
         DB.addTemperature(self.address[0], now, temperature)
-#        self.sendTemperature(now, temperature)
+        self.sendTemperature(now, temperature)
 
 	# Example Json OBJ ==> { 'msg': 'getTemperature', 'address': 'xxx.xxx.xxx.xxx' }
     def handle_getAllTemperatures(self, obj):
@@ -119,12 +120,13 @@ class WebSocketHandler(WebSocket):
         payload = DB.getAllTemperatures(address)
 	self.sendMessage(payload)
 
-#    def sendTemperature(self, time, temperature):
-#        print('sendTemperature :', temperature)
-#        obj = {'msg': 'temperature', 'temperature': temperature, 'time': time}
-#        msg = json.dumps(obj)
-#        for fileno, connection in self.server.connections.items() :
-#            connection.sendMessage(msg)
+	# TODO: Send trame only client and not sensor
+    def sendTemperature(self, time, temperature):
+        print('---------------------func_sendTemperatures--------------------------')
+        obj = {'temperature': temperature, 'time': time}
+        payload = json.dumps(obj)
+        for fileno, connection in self.server.connections.items() :
+		connection.sendMessage(payload)
 
 # ============================================================================
 if __name__ == "__main__" :
@@ -132,10 +134,8 @@ if __name__ == "__main__" :
     	server = SimpleWebSocketServer(config.socketBind, config.socketPort, WebSocketHandler)
     	server.serveforever()
     except KeyboardInterrupt:
-	#TODO Gerer les exceptions
+	#TODO close connexion
 	pass
 	print('close')
 	#DB.updateModule(self.address[0], 'DISCONNECTED')
     #finally:
-	
-
