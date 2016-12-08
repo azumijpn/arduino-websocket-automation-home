@@ -12,8 +12,9 @@ SQL_CREATE_MODULES = """
 CREATE TABLE IF NOT EXISTS modules (
 	ID		integer NOT NULL PRIMARY KEY AUTOINCREMENT,
 	address  	varchar(30) NOT NULL UNIQUE,
-	type		varchar(30) UNIQUE DEFAULT UNKNOWN,
-	location	varchar(30) UNIQUE DEFAULT UNKNOWN
+	sensor		varchar(30) DEFAULT UNKNOWN,
+	location	varchar(30) DEFAULT UNKNOWN,
+	status		varchar(15) NULL
 )
 """
 
@@ -36,10 +37,11 @@ CREATE TABLE IF NOT EXISTS hygrometrie (
 """
 
 # ============================================================================
-class DashboardDatabase(object) :
+class Database(object) :
 
-    def __init__(self, dbname) :
+    def __init__(self, dbname):
         self.db = sqlite3.connect(dbname)
+	self.db.row_factory = sqlite3.Row
         cursor = self.db.cursor()
         cursor.execute(SQL_CREATE_MODULES)
         cursor.execute(SQL_CREATE_TEMPERATURES)
@@ -48,54 +50,92 @@ class DashboardDatabase(object) :
 
     def addTemperature(self, address, time, temperature):
         cursor = self.db.cursor()
-        cursor.execute("INSERT INTO temperatures(time, temperature) VALUES (?, ?)", (time, temperature))
+        cursor.execute("INSERT INTO temperatures(id_Module,temperature,time) SELECT ID, ?, ? FROM modules WHERE address=?", [temperature, time, address])
         self.db.commit()
 
-    def addModule(self, address):
+    def addModule(self, address, sensor):
         cursor = self.db.cursor()
-	cursor.execute("INSERT OR IGNORE INTO modules(address) VALUES (?)", [address])
+	cursor.execute("INSERT OR IGNORE INTO modules(address, sensor, status) VALUES (?, ?, 'CONNECTED')", [address, sensor])
         self.db.commit()
 
-DB = DashboardDatabase("database.db3")
+    def updateModule(self, address, status):
+        cursor = self.db.cursor()
+	cursor.execute("UPDATE modules SET status=? WHERE address=?", [status, address])
+        self.db.commit()
+
+	#TODO: date limite or limit de line
+	#TODO: add test line is empty
+    def getAllTemperatures(self, address):
+	print('---------------DB getAlltemperatures-------------------')
+        cursor = self.db.cursor()
+        rows = cursor.execute("SELECT temperature,time FROM temperatures INNER JOIN modules WHERE address=?", [address]).fetchall()
+	json_obj = json.dumps( [dict(ix) for ix in rows] ) #CREATE JSON
+	print(json_obj)
+	return json_obj
+
+DB = Database("database.db3")
 
 # ============================================================================
-class DashboardWebSocketHandler(WebSocket):
+class WebSocketHandler(WebSocket):
 
     def handleConnected(self):
-	DB.addModule(self.address[0])
 	print(self.address, 'connected')
+	DB.updateModule(self.address[0], 'CONNECTED')
 
     def handleClose(self):
         print(self.address, 'closed')
+	DB.updateModule(self.address[0], 'DISCONNECTED')
 
-	# Example Json OBJ ==> { 'msg': 'setTemperature', 'temperature': '18.13' }
+	# Request type Json OBJ ==> { 'msg': '<methode><request>', 'sensor': 'arduino' '<resquest>': 'value' }
+	# Example { 'msg': 'setTemperature', 'sensor': 'arduino' 'temperature': '18.13' }
     def handleMessage(self):
+        print('----------------------func_message------------------------')
         print('message :', self.data)
         obj = json.loads(self.data)
+	if 'sensor' in obj:
+		DB.addModule(self.address[0], obj['sensor'])
         if not obj: return
         msg = obj['msg']
         print('msg :', msg)
         if not msg: return
         methodName = "handle_" + msg
-        if hasattr(self, methodName) :
-            getattr(self, methodName)(obj)
+        if hasattr(self, methodName):
+		getattr(self, methodName)(obj)
 
+	# JSON structure { 'msg': 'setTemperature', 'sensor': 'arduino' 'temperature': '18.13' }
     def handle_setTemperature(self, obj):
+        print('----------------------func_setTemperature------------------------')
         temperature = float(obj['temperature'])
         print('temperature', temperature)
         now = int(time.time())
         print('time', now)
-        DB.addTemperature(self.address, now, temperature)
+        DB.addTemperature(self.address[0], now, temperature)
         self.sendTemperature(now, temperature)
 
+	# Example Json OBJ ==> { 'msg': 'getTemperature', 'address': 'xxx.xxx.xxx.xxx' }
+    def handle_getAllTemperatures(self, obj):
+        print('---------------------func_getAllTemperatures--------------------------')
+        address = obj['address']
+        print('address', address)
+        payload = DB.getAllTemperatures(address)
+	self.sendMessage(payload)
+
+	# TODO: Send trame only client and not sensor
     def sendTemperature(self, time, temperature):
-        print('sendTemperature :', temperature)
-        obj = {'msg': 'temperature', 'temperature': temperature, 'time': time}
-        msg = json.dumps(obj)
+        print('---------------------func_sendTemperatures--------------------------')
+        obj = {'temperature': temperature, 'time': time}
+        payload = json.dumps(obj)
         for fileno, connection in self.server.connections.items() :
-            connection.sendMessage(msg)
+		connection.sendMessage(payload)
 
 # ============================================================================
-if __name__ == "__main__" : 
-    server = SimpleWebSocketServer(config.socketBind, config.socketPort, DashboardWebSocketHandler)
-    server.serveforever()
+if __name__ == "__main__" :
+    try:
+    	server = SimpleWebSocketServer(config.socketBind, config.socketPort, WebSocketHandler)
+    	server.serveforever()
+    except KeyboardInterrupt:
+	#TODO close connexion
+	pass
+	print('close')
+	#DB.updateModule(self.address[0], 'DISCONNECTED')
+    #finally:

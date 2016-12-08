@@ -16,6 +16,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <ArduinoJson.h>
+#include <avr/wdt.h>
 
 // Define a maximum framelength to 64 bytes. Default is 256. Don't Work !!!
 #define MAX_FRAME_LENGTH 256
@@ -30,12 +31,12 @@ DallasTemperature sensor_cumulus(&TMP_CUMULUS);
 
 /*################# Parameters #################*/
 
-//const String LOCATION = "CUMULUS";          // Emplacement du capteur arduino
-const String HOSTNAME = "ARDUINO_ETHERNET"; // Name arduino
+//const String LOCATION = "CUMULUS";        // Emplacement du capteur arduino
+const String SENSOR = "ARDUINO_ETHERNET";   // Name arduino
 #define IPSERVER   "192.168.100.245"        // Serveur distant
 #define PORT        8000                    // Port du serveur distant
 #define PATH        "/"                     // Path
-#define TIMECYCLE   10                    // Time in ms
+#define TIMECYCLE   1000                    // Time in ms
 #define BAUDRATE    115200                  //Serial speed
 
 // Ethernet Configuration
@@ -52,33 +53,27 @@ EthernetClient client;
 // Websocket initialization
 WSClient websocket;
 
+//watchdog
+void reset_software(void) {
+  wdt_enable(WDTO_15MS);
+  for(;;);
+}
+
 void transmission(char *objJson) {
-
-  if (client.connect(IPSERVER, PORT)) {
-    Serial.println("Connected");
-
-    if (websocket.handshake(client)) {
-      Serial.println("Handshake successful");
-
-      String data = websocket.getData();
-  
-      if (data.length() > 0) {
-         Serial.print("Received data: ");
-         Serial.println(data);
-      }
-
-      websocket.sendData(objJson);
-
-    } else {
-      Serial.println("Handshake failed.");
-    }
- 
+  if (client.connected()) {
+    websocket.sendData(objJson); 
   } else {
-    Serial.println("Connection failed.");
+    reset_software();
   }
+}
 
-  delay(500);
-  websocket.disconnect();
+void receive() {
+  String data = websocket.getData();
+  
+  if (data.length() > 0) {
+    Serial.print("Received data: ");
+    Serial.println(data);
+  }
 }
 
 void setup() {
@@ -97,15 +92,30 @@ void setup() {
 
   delay(100);
 
+  //WebSocket Connexion
   // Define path and host for Handshaking with the server
   websocket.path = PATH;
   websocket.host = IPSERVER;
 
+  if (client.connect(IPSERVER, PORT)) {
+    Serial.println("Connected");
+
+    if (websocket.handshake(client)) {
+      Serial.println("Handshake successful");
+    } else {
+      Serial.println("Handshake failed.");
+      reset_software();
+    }
+ 
+  } else {
+    Serial.println("Connection failed.");
+    reset_software();
+  }
 }
 
 void loop() {
 
-  char Buff[70];
+  char Buff[80];
   StaticJsonBuffer<200> jsonBufferTemp;
   
   sensor_cumulus.requestTemperatures();
@@ -114,12 +124,13 @@ void loop() {
 
   JsonObject& jsonTemperature = jsonBufferTemp.createObject();
   jsonTemperature["msg"] = "setTemperature";
-  //jsonTemperature["location"] = LOCATION;
+  jsonTemperature["sensor"] = SENSOR;
   jsonTemperature["temperature"] = temperature;
 
   jsonTemperature.printTo(Buff, sizeof(Buff));
   Serial.println(Buff);
 
+  receive();
   transmission(Buff);
   
   delay(TIMECYCLE);

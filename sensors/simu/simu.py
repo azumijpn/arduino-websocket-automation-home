@@ -1,5 +1,7 @@
+#!/usr/bin/env python
+
 import websocket
-import _thread
+import threading
 import time
 import json
 import random
@@ -19,7 +21,7 @@ def on_open(ws):
             obj = {'msg': 'setTemperature', 'temperature' : random.randint(10, 28)}
             ws.send(json.dumps(obj))
             time.sleep(5)
-    _thread.start_new_thread(run, ())
+    _threading.start_new_thread(run, ())
 
 if __name__ == "__main__":
     websocket.enableTrace(True)

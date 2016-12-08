@@ -5,6 +5,9 @@ cursor.execute('SELECT SQLITE_VERSION()')
 data = cursor.fetchone()    
 print "SQLite version: %s" % data
 cursor.execute("SELECT * FROM temperatures")
+rows = cursor.fetchall()
+for row in rows:
+        print row
 cursor.execute("SELECT * FROM modules")
 rows = cursor.fetchall()
 for row in rows:
