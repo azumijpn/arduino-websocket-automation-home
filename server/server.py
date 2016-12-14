@@ -134,8 +134,5 @@ if __name__ == "__main__" :
     	server = SimpleWebSocketServer(config.socketBind, config.socketPort, WebSocketHandler)
     	server.serveforever()
     except KeyboardInterrupt:
-	#TODO close connexion
-	pass
-	print('close')
-	#DB.updateModule(self.address[0], 'DISCONNECTED')
+	server.close()
     #finally:
