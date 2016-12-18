@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS hygrometrie (
 """
 
 # ============================================================================
-class Database(object) :
+class Database(object):
 
     def __init__(self, dbname):
         self.db = sqlite3.connect(dbname)
