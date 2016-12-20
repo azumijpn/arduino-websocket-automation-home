@@ -5,11 +5,6 @@ import sys
 import time
 import threading
 
-#class sensor(object):
-#
-#    def __init__(self, port, baudrate, timeout):
-#	self.ser = Serial(port, baudrate, timeout=0.1)
-#	
 
 class Protocol(object):
     """\
@@ -32,12 +27,10 @@ class Protocol(object):
             raise exc
 
 
-# Packetizer
 class Packetizer(Protocol):
     """
     Read binary packets from serial port. Packets are expected to be terminated
     with a TERMINATOR byte (null byte by default).
-
     The class also keeps track of the transport.
     """
 
@@ -68,7 +61,54 @@ class Packetizer(Protocol):
         raise NotImplementedError('please implement functionality in handle_packet')
 
 
-# LineReader
+class FramedPacket(Protocol):
+    """
+    Read binary packets. Packets are expected to have a start and stop marker.
+    The class also keeps track of the transport.
+    """
+
+    START = b'('
+    STOP = b')'
+
+    def __init__(self):
+        self.packet = bytearray()
+        self.in_packet = False
+        self.transport = None
+
+    def connection_made(self, transport):
+        """Store transport"""
+        self.transport = transport
+
+    def connection_lost(self, exc):
+        """Forget transport"""
+        self.transport = None
+        self.in_packet = False
+        del self.packet[:]
+        super(FramedPacket, self).connection_lost(exc)
+
+    def data_received(self, data):
+        """Find data enclosed in START/STOP, call handle_packet"""
+        for byte in serial.iterbytes(data):
+            if byte == self.START:
+                self.in_packet = True
+            elif byte == self.STOP:
+                self.in_packet = False
+                self.handle_packet(bytes(self.packet)) # make read-only copy
+                del self.packet[:]
+            elif self.in_packet:
+                self.packet.extend(byte)
+            else:
+                self.handle_out_of_packet_data(byte)
+
+    def handle_packet(self, packet):
+        """Process packets - to be overridden by subclassing"""
+        raise NotImplementedError('please implement functionality in handle_packet')
+
+    def handle_out_of_packet_data(self, data):
+        """Process data that is received outside of packets"""
+        pass
+
+
 class LineReader(Packetizer):
     """
     Read and write (Unicode) lines from/to serial port.
@@ -94,25 +134,24 @@ class LineReader(Packetizer):
         # + is not the best choice but bytes does not support % or .format in py3 and we want a single write call
         self.transport.write(text.encode(self.ENCODING, self.UNICODE_HANDLING) + self.TERMINATOR)
 
-
-# ReaderThread
-class ReaderThread(threading.Thread):
+# Threading
+class serialSensorThread(threading.Thread):
     """\
     Implement a serial port read loop and dispatch to a Protocol instance (like
     the asyncio.Protocol) but do it with threads.
     Calls to close() will close the serial port but it is also possible to just
     stop() this thread and continue the serial port instance otherwise.
     """
-
-    def __init__(self, serial_instance, protocol_factory):
+    def __init__(self, ser, protocol_factory):
         """\
         Initialize thread.
         Note that the serial_instance' timeout is set to one second!
         Other settings are not changed.
         """
-        super(ReaderThread, self).__init__()
+        #super(ReaderThread, self).__init__()
+        super(serialSensorThread, self).__init__()
         self.daemon = True
-        self.serial = serial_instance
+        self.serial = ser
         self.protocol_factory = protocol_factory
         self.alive = True
         self._lock = threading.Lock()
@@ -140,10 +179,10 @@ class ReaderThread(threading.Thread):
             return
         error = None
         self._connection_made.set()
-        while self.alive:
+        while self.alive and self.serial.is_open():
             try:
                 # read all that is there or wait for one byte (blocking)
-                data = self.serial.readline()
+                data = self.serial.read(self.serial.in_waiting or 1)
             except serial.SerialException as e:
                 # probably some I/O problem such as disconnected USB serial
                 # adapters -> exit
@@ -211,7 +250,7 @@ if __name__ == '__main__':
         def connection_made(self, transport):
             super(PrintLines, self).connection_made(transport)
             sys.stdout.write('port opened\n')
-            #self.write_line('hello world')
+            self.write_line('hello world')
 
         def handle_line(self, data):
             sys.stdout.write('line received: {!r}\n'.format(data))
@@ -223,7 +262,9 @@ if __name__ == '__main__':
 
     for i in range(0, len(config.portCom)):
         ser = Serial(config.portCom[i]['port'], config.portCom[i]['baudrate'], timeout=0.1)
-        if ser.isOpen():
-            while True:
-               ligne = ser.readline()
-               print ligne
+	t = serialSensorThread(ser, PrintLines)
+	t.start()
+#        if ser.isOpen():
+#            while True:
+#               ligne = ser.readline()
+#               print ligne
