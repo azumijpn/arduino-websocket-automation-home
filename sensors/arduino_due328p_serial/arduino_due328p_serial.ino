@@ -36,11 +36,7 @@ const String SENSOR = "ARDUINO_DUE_SERIAL"; // Name arduino
 //}
 
 void transmission(char *objJson) {
-  if (Serial.available()) {
-    //Serial.write(objJson);
-  } else {
-//    reset_software();
-  }
+  Serial.write(objJson);
 }
 
 void receive() {
@@ -78,13 +74,9 @@ void loop() {
   jsonTemperature["temperature"] = temperature;
 
   jsonTemperature.printTo(Buff, sizeof(Buff));
-  Serial.println(Buff);
-  delay(5000w);
-  
-  Serial.write(Buff);
 
   //receive();
-  //transmission(Buff);
+  transmission(Buff);
 
   delay(TIMECYCLE);
 }
