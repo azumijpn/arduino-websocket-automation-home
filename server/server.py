@@ -1,4 +1,5 @@
 from SimpleWebSocketServer import SimpleWebSocketServer, WebSocket
+import SerialInterface
 import json
 import sqlite3
 import time
@@ -37,7 +38,7 @@ CREATE TABLE IF NOT EXISTS hygrometrie (
 """
 
 # ============================================================================
-class Database(object) :
+class Database(object):
 
     def __init__(self, dbname):
         self.db = sqlite3.connect(dbname)
@@ -126,16 +127,34 @@ class WebSocketHandler(WebSocket):
         obj = {'temperature': temperature, 'time': time}
         payload = json.dumps(obj)
         for fileno, connection in self.server.connections.items() :
-		connection.sendMessage(payload)
+	    connection.sendMessage(payload)
 
 # ============================================================================
 if __name__ == "__main__" :
+
+    # For enable in config.py config.isSerial = True
+    if config.isSerial:
+        s = dict()
+        for i in range(0, len(config.portCom)):
+            s[i] = SerialManager(config.portCom[i]['port'], config.portCom[i]['baudrate'], timeout=0.1)
+            s[i].sleeptime = None
+            s[i].read_num_size = 512
+            s[i].start()
+
+	# TODO: find a method to forward in_queue.get() in the WebSockethandler class
+        try:
+            while True:
+                data = s[0].in_queue.get()
+                print(repr(data))
+        except KeyboardInterrupt:
+            s[0].close()
+        finally:
+            s[0].close()
+        s[0].join()
+
     try:
     	server = SimpleWebSocketServer(config.socketBind, config.socketPort, WebSocketHandler)
     	server.serveforever()
     except KeyboardInterrupt:
-	#TODO close connexion
-	pass
-	print('close')
-	#DB.updateModule(self.address[0], 'DISCONNECTED')
+	server.close()
     #finally:
